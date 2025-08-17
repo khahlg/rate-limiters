@@ -1,64 +1,28 @@
 import { RateLimiterType } from '@shared/enums/rateLimiter.enum.js';
+import type { RateLimiter, RateLimiterConstructorArgs } from '@shared/types/rateLimiter.type.js';
 import { NextFunction, Request, Response } from 'express';
-import {
-  FixedWindowCounterRateLimiter,
-  FixedWindowCounterRateLimiterConstructorArgs,
-} from './fixedWindowCounter.rateLimiter.js';
-import {
-  LeakingBucketRateLimiter,
-  LeakingBucketRateLimiterConstructorArgs,
-} from './leakingBucket.rateLimiter.js';
-import {
-  SlidingWindowCounterRateLimiter,
-  SlidingWindowCounterRateLimiterConstructorArgs,
-} from './slidingWindowCounter.rateLimiter.js';
-import {
-  SlidingWindowLogRateLimiter,
-  SlidingWindowLogRateLimiterConstructorArgs,
-} from './slidingWindowLog.rateLimiter.js';
-import {
-  TokenBucketRateLimiter,
-  TokenBucketRateLimiterConstructorArgs,
-} from './tokenBucket.rateLimiter.js';
+import { LeakingBucketRateLimiter, LeakingBucketRateLimiterConstructorArgs } from './leakingBucket.rateLimiter.js';
+import { TokenBucketRateLimiter, TokenBucketRateLimiterConstructorArgs } from './tokenBucket.rateLimiter.js';
 
 class RateLimiterFactory {
-  static create({
-    type,
-    args,
-  }: {
-    type: RateLimiterType;
-    args:
-      | FixedWindowCounterRateLimiterConstructorArgs
-      | LeakingBucketRateLimiterConstructorArgs
-      | SlidingWindowCounterRateLimiterConstructorArgs
-      | SlidingWindowLogRateLimiterConstructorArgs
-      | TokenBucketRateLimiterConstructorArgs;
-  }) {
+  static create({ type, args }: { type: RateLimiterType; args: RateLimiterConstructorArgs }): null | RateLimiter {
     switch (type) {
       case RateLimiterType.FIXED_WINDOW_COUNTER:
+        return null;
       case RateLimiterType.LEAKING_BUCKET:
+        return new LeakingBucketRateLimiter(args as LeakingBucketRateLimiterConstructorArgs);
       case RateLimiterType.SLIDING_WINDOW_COUNTER:
       case RateLimiterType.SLIDING_WINDOW_LOG:
         return null;
       case RateLimiterType.TOKEN_BUCKET:
-        return new TokenBucketRateLimiter(
-          args as TokenBucketRateLimiterConstructorArgs,
-        );
+        return new TokenBucketRateLimiter(args as TokenBucketRateLimiterConstructorArgs);
       default:
         return null;
     }
   }
 }
 
-const rateLimiterMap = new Map<
-  string,
-  | null
-  | FixedWindowCounterRateLimiter
-  | LeakingBucketRateLimiter
-  | SlidingWindowCounterRateLimiter
-  | SlidingWindowLogRateLimiter
-  | TokenBucketRateLimiter
->();
+const map = new Map<string, undefined | null | RateLimiter>();
 
 const createRateLimiter = ({
   getKey,
@@ -67,20 +31,16 @@ const createRateLimiter = ({
 }: {
   getKey: (req: Request) => string;
   rateLimiterType: RateLimiterType;
-  rateLimiterArgs:
-    | FixedWindowCounterRateLimiterConstructorArgs
-    | LeakingBucketRateLimiterConstructorArgs
-    | SlidingWindowCounterRateLimiterConstructorArgs
-    | SlidingWindowLogRateLimiterConstructorArgs
-    | TokenBucketRateLimiterConstructorArgs;
-}) => {
-  const rateLimiterMiddleware = (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    const key = getKey(req);
-    let rateLimiter = rateLimiterMap.get(key);
+  rateLimiterArgs: RateLimiterConstructorArgs;
+}): [
+  rateLimiter: undefined | null | RateLimiter,
+  rateLimiterMiddleware: (req: Request, res: Response, next: NextFunction) => void,
+] => {
+  let rateLimiter: undefined | null | RateLimiter;
+
+  const rateLimiterMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    const key = `${rateLimiterType}_${getKey(req)}`;
+    rateLimiter = map.get(key);
 
     if (!rateLimiter) {
       rateLimiter = RateLimiterFactory.create({
@@ -92,17 +52,17 @@ const createRateLimiter = ({
         return next();
       }
 
-      rateLimiterMap.set(key, rateLimiter);
+      map.set(key, rateLimiter);
     }
 
-    if (!rateLimiter.allowRequest()) {
+    if (!rateLimiter.allowRequest({ expressRequestContext: { req, res, next } })) {
       return res.status(429).json({ message: 'Too many requests.' });
     }
 
     return next();
   };
 
-  return rateLimiterMiddleware;
+  return [rateLimiter, rateLimiterMiddleware];
 };
 
 export { createRateLimiter };

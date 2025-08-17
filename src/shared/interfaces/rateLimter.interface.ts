@@ -1,5 +1,17 @@
-interface RateLimiter {
-  allowRequest(): boolean;
+import { NextFunction, Request, Response } from 'express';
+
+interface ExpressRequestContext {
+  req: Request;
+  res: Response;
+  next: NextFunction;
 }
 
-export type { RateLimiter };
+interface CustomExpressRequestContext extends ExpressRequestContext {
+  id: string;
+}
+
+interface RateLimiter {
+  allowRequest({ expressRequestContext }: { expressRequestContext: ExpressRequestContext }): boolean;
+}
+
+export type { CustomExpressRequestContext, ExpressRequestContext, RateLimiter };

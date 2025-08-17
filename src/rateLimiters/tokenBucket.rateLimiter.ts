@@ -1,71 +1,65 @@
 import { logger } from '@configs/index.config.js';
-import { RateLimiter } from '@shared/interfaces/rateLimter.interface.js';
+import type { RateLimiter } from '@shared/interfaces/rateLimter.interface.js';
 
 interface TokenBucketRateLimiterConstructorArgs {
   capacity: number;
-  consumeAmount: number;
-  refillAmount: number;
-  refillIntervalInSeconds: number;
+  refillingRate: number[];
 }
 
 class TokenBucketRateLimiter implements RateLimiter {
-  // Maximum number of tokens in bucket
+  // The maximum number of tokens in bucket
   private readonly capacity: number;
-  // Number of tokens in bucket
+  // Refilling rate, an array of two values.
+  // The first value is the number of tokens that should be added to the bucket after a certain amount of time, which is the second value.
+  // The second value is the interval after which a specifid number of tokens that should be added to the bucket.
+  private readonly refillingRate: number[];
+  // The number of tokens in bucket
   private numberOfTokens: number;
-  // Number of tokens shound be consumed for each request
-  private readonly consumeAmount: number;
-  // Number of tokens should be added to bucket each refillIntervalInSeconds
-  private readonly refillAmount: number;
-  // Number of seconds shoud bucket be refilled with refillAmount tokens
-  private readonly refillIntervalInSeconds: number;
-  private refillIntervalId: null | NodeJS.Timeout = null;
+  private refillIntervalId: null | NodeJS.Timeout;
 
   constructor(args: TokenBucketRateLimiterConstructorArgs) {
     this.capacity = args.capacity;
+    this.refillingRate = args.refillingRate;
     this.numberOfTokens = args.capacity;
-    this.consumeAmount = args.consumeAmount;
-    this.refillAmount = args.refillAmount;
-    this.refillIntervalInSeconds = args.refillIntervalInSeconds;
+    this.refillIntervalId = null;
 
-    this.startRefillInterval();
+    this.startRefillingTokensInterval();
   }
 
-  startRefillInterval(): void {
+  startRefillingTokensInterval(): void {
     if (this.refillIntervalId) return;
 
     this.refillIntervalId = setInterval(() => {
       if (this.numberOfTokens !== this.capacity) {
-        // Use Math.min to make sure number of tokens in bucket is always <= bucket's capacity
-        this.numberOfTokens = Math.min(
-          this.capacity,
-          this.numberOfTokens + this.refillAmount,
-        );
+        this.numberOfTokens = Math.min(this.capacity, this.numberOfTokens + this.refillingRate[0]);
         logger.info(
-          `Added ${this.refillAmount} ${this.refillAmount > 1 ? 'tokens' : 'token'} to bucket, current number of tokens in bucket is ${this.numberOfTokens}`,
+          `Added ${this.refillingRate[0]} ${this.refillingRate[0] > 1 ? 'tokens' : 'token'} to bucket, current number of tokens in bucket is ${this.numberOfTokens}`,
         );
       }
-    }, this.refillIntervalInSeconds * 1000);
+    }, this.refillingRate[1] * 1000);
   }
 
-  stopRefillInterval(): void {
+  stopRefillingTokensInterval(): void {
     if (this.refillIntervalId) {
       clearInterval(this.refillIntervalId);
       this.refillIntervalId = null;
     }
   }
 
-  allowRequest(): boolean {
+  consumeToken(): boolean {
     if (this.numberOfTokens > 0) {
-      this.numberOfTokens -= this.consumeAmount;
-      logger.info(
-        `Consumed ${this.consumeAmount} ${this.consumeAmount > 1 ? 'tokens' : 'token'} from bucket, number of tokens left in bucket is ${this.numberOfTokens}`,
-      );
+      this.numberOfTokens -= 1;
+      logger.info(`Consumed 1 token from bucket, number of tokens left in bucket is ${this.numberOfTokens}`);
 
       return true;
     }
 
+    logger.error('No token left in bucket, request will be throttled.');
     return false;
+  }
+
+  allowRequest(): boolean {
+    return this.consumeToken();
   }
 }
 
