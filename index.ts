@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 config();
 
 import { logger } from '@configs/index.config.js';
+import { FixedWindowCounterRateLimiter } from '@rateLimiters/fixedWindowCounter.rateLimiter.js';
 import { createRateLimiter } from '@rateLimiters/index.rateLimiter.js';
 import { LeakingBucketRateLimiter } from '@rateLimiters/leakingBucket.rateLimiter.js';
 import { TokenBucketRateLimiter } from '@rateLimiters/tokenBucket.rateLimiter.js';
@@ -11,6 +12,15 @@ import express from 'express';
 const { SERVICE_NAME, PORT } = process.env;
 
 const expressApp = express();
+
+const [fixedWindowCounterRateLimiter, fixedWindowCounterRateLimiterMiddleware] = createRateLimiter({
+  getKey: (req) => req.ip!,
+  rateLimiterType: RateLimiterType.FIXED_WINDOW_COUNTER,
+  rateLimiterArgs: {
+    windowThreshold: 5,
+    windowTimeInSeconds: 1,
+  },
+});
 
 const [leakingBucketRateLimiter, leakingTokenRateLimiterMiddleware] = createRateLimiter({
   getKey: (req) => req.ip!,
@@ -30,7 +40,7 @@ const [tokenBucketRateLimiter, tokenBucketRateLimiterMiddleware] = createRateLim
   },
 });
 
-expressApp.get('/fixed-window-counter', (_, res) => {
+expressApp.get('/fixed-window-counter', fixedWindowCounterRateLimiterMiddleware, (_, res) => {
   return res
     .status(200)
     .send({ message: `Hello from ${SERVICE_NAME}, rate limiter used: ${RateLimiterType.FIXED_WINDOW_COUNTER}` });
@@ -71,6 +81,10 @@ function shutdown(signal: string) {
     if (err) {
       logger.error('An error occurred while closing server', err);
       process.exit(1);
+    }
+
+    if (fixedWindowCounterRateLimiter && fixedWindowCounterRateLimiter instanceof FixedWindowCounterRateLimiter) {
+      fixedWindowCounterRateLimiter.stopCreatingWindowInterval();
     }
 
     if (leakingBucketRateLimiter && leakingBucketRateLimiter instanceof LeakingBucketRateLimiter) {

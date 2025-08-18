@@ -21,7 +21,7 @@ class LeakingBucketRateLimiter implements RateLimiter {
   // The second value is the time interval during which the specified number of requests are processed.
   private readonly leakingRequestsRate: number[];
 
-  private leakingRequestsIntervalId: null | NodeJS.Timeout;
+  private leakRequestsIntervalId: null | NodeJS.Timeout;
   private numberOfRequestsReceived: number;
 
   constructor(args: LeakingBucketRateLimiterConstructorArgs) {
@@ -29,7 +29,7 @@ class LeakingBucketRateLimiter implements RateLimiter {
     this.queueCapacity = args.queueCapacity;
     this.leakingRequestsRate = args.leakingRequestsRate;
 
-    this.leakingRequestsIntervalId = null;
+    this.leakRequestsIntervalId = null;
     this.numberOfRequestsReceived = 0;
 
     this.startLeakingRequestsInterval();
@@ -47,18 +47,18 @@ class LeakingBucketRateLimiter implements RateLimiter {
   }
 
   startLeakingRequestsInterval(): void {
-    if (this.leakingRequestsIntervalId) return;
+    if (this.leakRequestsIntervalId) return;
 
-    this.leakingRequestsIntervalId = setInterval(
+    this.leakRequestsIntervalId = setInterval(
       () => this.processRequest(),
       (this.leakingRequestsRate[1] * 1000) / this.leakingRequestsRate[0],
     );
   }
 
   stopLeakingRequestsInterval(): void {
-    if (this.leakingRequestsIntervalId) {
-      clearInterval(this.leakingRequestsIntervalId);
-      this.leakingRequestsIntervalId = null;
+    if (this.leakRequestsIntervalId) {
+      clearInterval(this.leakRequestsIntervalId);
+      this.leakRequestsIntervalId = null;
     }
   }
 

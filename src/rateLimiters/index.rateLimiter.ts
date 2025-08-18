@@ -1,6 +1,10 @@
 import { RateLimiterType } from '@shared/enums/rateLimiter.enum.js';
 import type { RateLimiter, RateLimiterConstructorArgs } from '@shared/types/rateLimiter.type.js';
 import { NextFunction, Request, Response } from 'express';
+import {
+  FixedWindowCounterRateLimiter,
+  FixedWindowCounterRateLimiterConstructorArgs,
+} from './fixedWindowCounter.rateLimiter.js';
 import { LeakingBucketRateLimiter, LeakingBucketRateLimiterConstructorArgs } from './leakingBucket.rateLimiter.js';
 import { TokenBucketRateLimiter, TokenBucketRateLimiterConstructorArgs } from './tokenBucket.rateLimiter.js';
 
@@ -8,7 +12,7 @@ class RateLimiterFactory {
   static create({ type, args }: { type: RateLimiterType; args: RateLimiterConstructorArgs }): null | RateLimiter {
     switch (type) {
       case RateLimiterType.FIXED_WINDOW_COUNTER:
-        return null;
+        return new FixedWindowCounterRateLimiter(args as FixedWindowCounterRateLimiterConstructorArgs);
       case RateLimiterType.LEAKING_BUCKET:
         return new LeakingBucketRateLimiter(args as LeakingBucketRateLimiterConstructorArgs);
       case RateLimiterType.SLIDING_WINDOW_COUNTER:

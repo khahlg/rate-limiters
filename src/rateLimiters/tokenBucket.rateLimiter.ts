@@ -7,13 +7,13 @@ interface TokenBucketRateLimiterConstructorArgs {
 }
 
 class TokenBucketRateLimiter implements RateLimiter {
-  // The maximum number of tokens in bucket
+  // The maximum number of tokens in bucket.
   private readonly capacity: number;
   // Refilling rate, an array of two values.
   // The first value is the number of tokens that should be added to the bucket after a certain amount of time, which is the second value.
   // The second value is the interval after which a specifid number of tokens that should be added to the bucket.
   private readonly refillingRate: number[];
-  // The number of tokens in bucket
+  // The number of tokens in bucket.
   private numberOfTokens: number;
   private refillIntervalId: null | NodeJS.Timeout;
 
