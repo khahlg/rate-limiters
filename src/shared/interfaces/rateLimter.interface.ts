@@ -11,7 +11,16 @@ interface CustomExpressRequestContext extends ExpressRequestContext {
 }
 
 interface RateLimiter {
-  allowRequest({ expressRequestContext }: { expressRequestContext: ExpressRequestContext }): boolean;
+  allowRequest({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): boolean;
+  setHeaders({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): void;
 }
 
 export type { CustomExpressRequestContext, ExpressRequestContext, RateLimiter };

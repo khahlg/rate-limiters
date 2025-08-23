@@ -1,5 +1,8 @@
 import { logger } from '@configs/logger.config.js';
-import { RateLimiter } from '@shared/interfaces/rateLimter.interface.js';
+import {
+  ExpressRequestContext,
+  RateLimiter,
+} from '@shared/interfaces/rateLimter.interface.js';
 
 interface FixedWindowCounterRateLimiterConstructorArgs {
   windowThreshold: number;
@@ -27,7 +30,10 @@ class FixedWindowCounterRateLimiter implements RateLimiter {
   startCreatingWindowInterval(): void {
     if (this.createWindowIntervalId) return;
 
-    this.createWindowIntervalId = setInterval(() => this.createNewWindow(), this.windowTimeInSeconds * 1000);
+    this.createWindowIntervalId = setInterval(
+      () => this.createNewWindow(),
+      this.windowTimeInSeconds * 1000,
+    );
   }
 
   stopCreatingWindowInterval(): void {
@@ -45,7 +51,9 @@ class FixedWindowCounterRateLimiter implements RateLimiter {
   }
 
   allowRequest(): boolean {
-    logger.info(`Received new request, window ${this.windowNumberOfRequestsReceived}/${this.windowThreshold}.`);
+    logger.info(
+      `Received new request, window ${this.windowNumberOfRequestsReceived}/${this.windowThreshold}.`,
+    );
 
     if (this.windowNumberOfRequestsReceived >= this.windowThreshold) {
       logger.error('Threshold exeeded, request will be throttled.');
@@ -54,6 +62,21 @@ class FixedWindowCounterRateLimiter implements RateLimiter {
 
     this.windowNumberOfRequestsReceived += 1;
     return true;
+  }
+
+  setHeaders({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): void {
+    const { res } = expressRequestContext;
+
+    res.setHeader(
+      'X-Ratelimit-Remaining',
+      this.windowThreshold - this.windowNumberOfRequestsReceived,
+    );
+    res.setHeader('X-Ratelimit-Limit', this.windowThreshold);
+    res.setHeader('X-Ratelimit-Retry-After', this.windowTimeInSeconds);
   }
 }
 

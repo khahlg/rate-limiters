@@ -1,5 +1,8 @@
 import { logger } from '@configs/index.config.js';
-import type { RateLimiter } from '@shared/interfaces/rateLimter.interface.js';
+import type {
+  ExpressRequestContext,
+  RateLimiter,
+} from '@shared/interfaces/rateLimter.interface.js';
 
 interface TokenBucketRateLimiterConstructorArgs {
   capacity: number;
@@ -31,7 +34,10 @@ class TokenBucketRateLimiter implements RateLimiter {
 
     this.refillIntervalId = setInterval(() => {
       if (this.numberOfTokens !== this.capacity) {
-        this.numberOfTokens = Math.min(this.capacity, this.numberOfTokens + this.refillingRate[0]);
+        this.numberOfTokens = Math.min(
+          this.capacity,
+          this.numberOfTokens + this.refillingRate[0],
+        );
         logger.info(
           `Added ${this.refillingRate[0]} ${this.refillingRate[0] > 1 ? 'tokens' : 'token'} to bucket, current number of tokens in bucket is ${this.numberOfTokens}`,
         );
@@ -49,7 +55,9 @@ class TokenBucketRateLimiter implements RateLimiter {
   consumeToken(): boolean {
     if (this.numberOfTokens > 0) {
       this.numberOfTokens -= 1;
-      logger.info(`Consumed 1 token from bucket, number of tokens left in bucket is ${this.numberOfTokens}`);
+      logger.info(
+        `Consumed 1 token from bucket, number of tokens left in bucket is ${this.numberOfTokens}`,
+      );
 
       return true;
     }
@@ -60,6 +68,18 @@ class TokenBucketRateLimiter implements RateLimiter {
 
   allowRequest(): boolean {
     return this.consumeToken();
+  }
+
+  setHeaders({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): void {
+    const { res } = expressRequestContext;
+
+    res.setHeader('X-Ratelimit-Remaining', this.numberOfTokens);
+    res.setHeader('X-Ratelimit-Limit', this.capacity);
+    res.setHeader('X-Ratelimit-Retry-After', this.refillingRate[1]);
   }
 }
 

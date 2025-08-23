@@ -40,7 +40,9 @@ class LeakingBucketRateLimiter implements RateLimiter {
       const expressRequestContext = this.queue.pop();
 
       if (expressRequestContext) {
-        logger.info(`Start processing request with id: ${expressRequestContext.id}`);
+        logger.info(
+          `Start processing request with id: ${expressRequestContext.id}`,
+        );
         return expressRequestContext.next();
       }
     }
@@ -67,7 +69,9 @@ class LeakingBucketRateLimiter implements RateLimiter {
       ...expressRequestContext,
       id: this.numberOfRequestsReceived.toString(),
     };
-    logger.info(`Receive new request, request's id: ${this.numberOfRequestsReceived}`);
+    logger.info(
+      `Receive new request, request's id: ${this.numberOfRequestsReceived}`,
+    );
     this.numberOfRequestsReceived += 1;
 
     if (this.queue.length >= this.queueCapacity) {
@@ -83,8 +87,27 @@ class LeakingBucketRateLimiter implements RateLimiter {
     return true;
   }
 
-  allowRequest({ expressRequestContext }: { expressRequestContext: ExpressRequestContext }): boolean {
+  allowRequest({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): boolean {
     return this.pushRequestToQueue(expressRequestContext);
+  }
+
+  setHeaders({
+    expressRequestContext,
+  }: {
+    expressRequestContext: ExpressRequestContext;
+  }): void {
+    const { res } = expressRequestContext;
+
+    res.setHeader(
+      'X-Ratelimit-Remaining',
+      this.queueCapacity - this.queue.length,
+    );
+    res.setHeader('X-Ratelimit-Limit', this.queueCapacity);
+    res.setHeader('X-Ratelimit-Retry-After', this.leakingRequestsRate[1]);
   }
 }
 
